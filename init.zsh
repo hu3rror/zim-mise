@@ -30,15 +30,18 @@ if [[ -n "$MSYSTEM" ]]; then
 
     local cachedir=$1
 
-    # Cache patched activate (current mise inlines the exe path and has no
-    # static export PATH= line; hook-env is what rewrites PATH).
+    # The generated script embeds the PATH it was produced with, so PATH is
+    # part of the cache key: regenerate whenever it drifts.
     local activatefile=$cachedir/mise-activate.zsh
-    if [[ ! -e $activatefile || $activatefile -ot $command ]]; then
+    local pathfile=$cachedir/mise-activate.path
+    if [[ ! -e $activatefile || ! -e $pathfile || $activatefile -ot $command ||
+          "$(<$pathfile)" != "$PATH" ]]; then
       local mise_activate_script
       mise_activate_script="$($command activate zsh)"
       mise_activate_script="$(printf '%s\n' "$mise_activate_script" \
         | sed -E "s@[A-Za-z]:\\\\[^\"']*\\\\mise\\.exe@${command}@g")"
       print -r -- "$mise_activate_script" >| $activatefile
+      print -r -- "$PATH" >| $pathfile
       zcompile -UR $activatefile
     fi
     source $activatefile
@@ -79,9 +82,14 @@ elif (( ${+commands[mise]} )); then
       return
     fi
 
+    # The generated script embeds the PATH it was produced with, so PATH is
+    # part of the cache key: regenerate whenever it drifts.
     local activatefile=$1/mise-activate.zsh
-    if [[ ! -e $activatefile || $activatefile -ot $command ]]; then
+    local pathfile=$1/mise-activate.path
+    if [[ ! -e $activatefile || ! -e $pathfile || $activatefile -ot $command ||
+          "$(<$pathfile)" != "$PATH" ]]; then
       $command activate zsh >| $activatefile
+      print -r -- "$PATH" >| $pathfile
       zcompile -UR $activatefile
     fi
 
